@@ -1,0 +1,118 @@
+/* Opencode Assistant prototype styles
+   Uses Leo token approximations via CSS variables for easy mapping
+*/
+:root {
+  /* Leo tokens mapping (approx) */
+  --leo-bg: #0b1220; /* Leo background */
+  --leo-surface: #0f1724; /* surface for panels */
+  --leo-card: #0e2233; /* card background */
+  --leo-text: #e6eef9; /* primary text */
+  --leo-muted: #9fb0cc; /* muted text */
+  --leo-accent: #4f8cff; /* primary accent */
+  --leo-accent-strong: #3b6ed5;
+  --leo-border: #1f2b3a;
+  --success: #16a34a;
+  --danger: #ef4444;
+  --shadow: 0 6px 20px rgba(4, 8, 15, 0.7);
+}
+
+body {
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  background: linear-gradient(180deg, var(--leo-bg), #071019 100%);
+  color: var(--leo-text);
+  margin: 24px;
+}
+
+button { cursor: pointer; }
+
+#open-assistant {
+  background: linear-gradient(180deg, var(--leo-accent), var(--leo-accent-strong));
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.side-panel {
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  height: 70vh;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  background: var(--leo-surface);
+  border: 1px solid var(--leo-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(30px);
+  transition: transform 200ms ease, opacity 200ms ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.side-panel[aria-hidden="false"] {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.panel-header {
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 14px;
+  border-bottom: 1px solid var(--leo-border);
+}
+.panel-header h2 {
+  margin:0; font-size:16px;
+}
+.badge {
+  background: rgba(255,255,255,0.03);
+  color: var(--leo-muted);
+  padding:4px 8px;
+  border-radius:999px;
+  font-size:12px;
+}
+
+.panel-main {
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  overflow:auto;
+}
+
+.messages { display:flex; flex-direction:column; gap:8px; }
+.bubble {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  padding:10px 12px;
+  border-radius:8px;
+  color:var(--leo-text);
+  max-width:100%;
+}
+.bubble.user { align-self:flex-end; background: rgba(79,140,255,0.12); }
+.bubble.assistant { align-self:flex-start; }
+
+.panel-footer {
+  display:flex; gap:8px; padding:10px; border-top:1px solid var(--leo-border); align-items:center;
+}
+.panel-footer input[type='text'] { flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--leo-border); background:var(--leo-card); color:var(--leo-text); }
+.panel-footer button { padding:8px 10px; border-radius:8px; border:none; background:var(--leo-accent); color:white; }
+
+.status { color: var(--leo-muted); font-size:12px; min-height:18px; }
+
+/* Error / badges */
+.status.error { color: var(--danger); }
+.status.warn  { color: #f59e0b; }
+
+/* Small screens */
+@media (max-width: 600px) {
+  .side-panel { width: 100%; right:0; left:0; border-radius:0; height: 60vh; bottom: 0; }
+}
+
+/* High contrast helpers */
+.visually-hidden { position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap; }
