@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Opencode Assistant Prototype</title>
+  <link rel="stylesheet" href="/PROTOTYPE/style.css">
+</head>
+<body>
+  <button id="open-assistant" aria-label="Open Opencode Assistant">Open Assistant</button>
+
+  <aside id="opencode-panel" class="side-panel" role="dialog" aria-modal="false" aria-hidden="true" aria-labelledby="panel-title">
+    <header class="panel-header">
+      <h2 id="panel-title">Opencode Assistant</h2>
+      <div class="badge">Powered by OpenCode</div>
+      <div class="header-actions">
+        <button id="demo-btn" class="link">Try demo</button>
+        <button id="close-panel" aria-label="Close assistant">✕</button>
+      </div>
+    </header>
+    <main class="panel-main">
+      <div id="messages" class="messages" aria-live="polite" aria-atomic="false"></div>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+    </main>
+    <footer class="panel-footer">
+      <input id="prompt" type="text" placeholder="Ask Opencode..." aria-label="Prompt input" />
+      <button id="send">Send</button>
+    </footer>
+  </aside>
+
+  <template id="bubble-template">
+    <div class="bubble" role="article"></div>
+  </template>
+
+  <script src="/PROTOTYPE/app.js"></script>
+</body>
+</html>
