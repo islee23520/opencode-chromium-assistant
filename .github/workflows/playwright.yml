@@ -41,20 +41,45 @@ jobs:
             ls -la || true;
             exit 1
           )
-      - name: Run Node unit tests (capture logs)
+      - name: Run Node unit tests (start mock server & capture logs)
         working-directory: PROTOTYPE
         run: |
-          # Ensure we capture test output even if tests fail
           set -o pipefail
           mkdir -p test-results
+
+          echo "Starting mock server in background..." > test-results/mock.log
+          node ../tools/opencode-mock/server.js > test-results/mock.log 2>&1 & echo $! > test-results/mock.pid || true
+
+          # Wait for health endpoint
+          for i in `seq 1 15`; do
+            if curl -fsS http://localhost:4096/health >/dev/null 2>&1; then
+              echo "Mock server healthy" >> test-results/mock.log
+              break
+            fi
+            echo "Waiting for mock server... ($i)" >> test-results/mock.log
+            sleep 1
+          done
+
+          # Run the unit tests and capture logs
           npm run test:unit 2>&1 | tee test-results/unit.log || true
           rc=${PIPESTATUS[0]}
           echo "EXITCODE:$rc" >> test-results/unit.log
-          # Also run individual tests to produce per-test logs for debugging
+
+          # Also run individual tests separately for extra visibility
           node tests/client.test.js 2>&1 | tee test-results/client.log || true
           node tests/sse.test.js 2>&1 | tee test-results/sse.log || true
+
+          # Dump logs for debugging
           ls -la test-results || true
-          sed -n '1,400p' test-results/unit.log || true
+          sed -n '1,300p' test-results/unit.log || true
+          sed -n '1,200p' test-results/mock.log || true
+
+          # Stop mock server (best-effort)
+          if [ -f test-results/mock.pid ]; then
+            kill $(cat test-results/mock.pid) >/dev/null 2>&1 || true
+            rm -f test-results/mock.pid || true
+          fi
+
           exit $rc
       - name: Upload unit test logs
         if: always()
