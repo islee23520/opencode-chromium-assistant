@@ -23,9 +23,24 @@ jobs:
           key: npm-cache-${{ hashFiles('PROTOTYPE/package-lock.json') }}
           restore-keys: |
             npm-cache-
+      - name: Show PROTOTYPE workspace
+        run: |
+          echo "PWD: $(pwd)"
+          echo "Listing PROTOTYPE dir"
+          ls -la PROTOTYPE || true
+          echo "package.json:"
+          sed -n '1,120p' PROTOTYPE/package.json || true
+          echo "package-lock.json head:"
+          sed -n '1,60p' PROTOTYPE/package-lock.json || true
       - name: Install dependencies
         working-directory: PROTOTYPE
-        run: npm ci
+        run: |
+          npm ci --no-audit --prefer-offline --verbose || (
+            echo "npm install failed, show npm-debug.log if present"; 
+            test -f npm-debug.log && sed -n '1,400p' npm-debug.log || true;
+            ls -la || true;
+            exit 1
+          )
       - name: Run Node unit tests
         working-directory: PROTOTYPE
         run: npm run test:unit
