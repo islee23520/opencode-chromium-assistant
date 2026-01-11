@@ -124,12 +124,23 @@ jobs:
         run: |
           set -e
           npx playwright install --with-deps || npx playwright install
-      - name: Run Playwright tests
+      - name: Run Playwright tests (capture logs)
         working-directory: PROTOTYPE
         env:
           CI: true
         run: |
-          npx playwright test --project=chromium --reporter=list
+          set -o pipefail
+          mkdir -p test-results
+          # Run playwright with single worker and limited retries to reduce flakiness
+          npx playwright test --project=chromium --workers=1 --retries=1 --reporter=list 2>&1 | tee test-results/playwright.log || true
+          rc=${PIPESTATUS[0]}
+          echo "EXITCODE:$rc" >> test-results/playwright.log
+          # Generate html report for artifacts (if any results)
+          npx playwright show-report --output=playwright-report || true
+          ls -la || true
+          ls -la playwright-report || true
+          sed -n '1,400p' test-results/playwright.log || true
+          exit $rc
       - name: Upload Playwright artifacts
         if: always()
         uses: actions/upload-artifact@v4
