@@ -1,0 +1,68 @@
+name: Playwright smoke tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: PROTOTYPE/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('PROTOTYPE/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install deps
+        run: |
+          cd PROTOTYPE
+          npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('PROTOTYPE/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run unit/integration checks
+        run: |
+          node PROTOTYPE/tests/client.test.js
+
+      - name: Start mock server
+        run: |
+          node tools/opencode-mock/server.js &
+          sleep 1
+
+      - name: Serve prototype
+        run: |
+          npx http-server PROTOTYPE -p 3000 &
+          sleep 1
+
+      - name: Run Playwright tests
+        run: |
+          cd PROTOTYPE
+          npx playwright test --reporter=list
+
+      - name: Upload Playwright reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-reports
+          path: PROTOTYPE/test-results/**
