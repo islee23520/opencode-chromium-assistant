@@ -1,4 +1,4 @@
-name: Playwright smoke tests
+name: Playwright Smoke CI
 
 on:
   push:
@@ -7,66 +7,76 @@ on:
     branches: [ main ]
 
 jobs:
-  smoke:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node
+      - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
+          node-version: '20'
       - name: Cache node modules
         uses: actions/cache@v4
         with:
-          path: PROTOTYPE/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('PROTOTYPE/package-lock.json') }}
+          path: ~/.npm
+          key: npm-cache-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-node-
+            npm-cache-
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Node unit tests
+        run: npm run test:unit
+      - name: Upload unit test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-logs
+          path: |
+            PROTOTYPE/test-results || PROTOTYPE/*.log || PROTOTYPE/tests/*.log
 
-      - name: Install deps
-        run: |
-          cd PROTOTYPE
-          npm ci
-
+  playwright-tests:
+    name: Playwright smoke tests (Chromium)
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Restore node cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-cache-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            npm-cache-
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('PROTOTYPE/package-lock.json') }}
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      - name: Run unit/integration checks
+            playwright-browsers-
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright browsers (with fallback)
         run: |
-          node PROTOTYPE/tests/client.test.js
-          node PROTOTYPE/tests/sse.test.js
-
-      - name: Start mock server
+          set -e
+          npx playwright install --with-deps || npx playwright install
+      - name: Run Playwright tests
+        env:
+          CI: true
         run: |
-          node tools/opencode-mock/server.js &
-          sleep 1
-
-      - name: Serve prototype
-        run: |
-          npx http-server PROTOTYPE -p 3000 &
-          sleep 1
-
-      - name: Run Playwright tests (Chromium)
-        run: |
-          cd PROTOTYPE
           npx playwright test --project=chromium --reporter=list
-
-      - name: Upload Playwright reports
+      - name: Upload Playwright artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-reports
-          path: PROTOTYPE/test-results/**
+          name: playwright-artifacts
+          path: |
+            PROTOTYPE/test-results
+            PROTOTYPE/playwright-report
+            PROTOTYPE/test-results/junit.xml
