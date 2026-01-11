@@ -44,12 +44,18 @@ jobs:
       - name: Run Node unit tests (capture logs)
         working-directory: PROTOTYPE
         run: |
+          # Ensure we capture test output even if tests fail
+          set -o pipefail
           mkdir -p test-results
-          # Run the combined script and capture output
-          npm run test:unit 2>&1 | tee test-results/unit.log
-          # Also run individual tests separately to collect per-test logs
+          npm run test:unit 2>&1 | tee test-results/unit.log || true
+          rc=${PIPESTATUS[0]}
+          echo "EXITCODE:$rc" >> test-results/unit.log
+          # Also run individual tests to produce per-test logs for debugging
           node tests/client.test.js 2>&1 | tee test-results/client.log || true
           node tests/sse.test.js 2>&1 | tee test-results/sse.log || true
+          ls -la test-results || true
+          sed -n '1,400p' test-results/unit.log || true
+          exit $rc
       - name: Upload unit test logs
         if: always()
         uses: actions/upload-artifact@v4
