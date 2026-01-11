@@ -47,6 +47,7 @@ jobs:
       - name: Run unit/integration checks
         run: |
           node PROTOTYPE/tests/client.test.js
+          node PROTOTYPE/tests/sse.test.js
 
       - name: Start mock server
         run: |
