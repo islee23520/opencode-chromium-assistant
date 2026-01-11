@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "start-mock": "node ../tools/opencode-mock/server.js",
-    "test": "npx playwright test"
+    "test": "npx playwright test",
+    "test:unit": "node tests/client.test.js && node tests/sse.test.js"
   },
   "devDependencies": {
-    "@playwright/test": "^1.38.0"
+    "@playwright/test": "^1.38.0",
+    "eventsource": "^1.1.1"
   }
 }
