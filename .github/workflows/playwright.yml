@@ -8,7 +8,10 @@ on:
 
 jobs:
   smoke:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -55,10 +58,10 @@ jobs:
           npx http-server PROTOTYPE -p 3000 &
           sleep 1
 
-      - name: Run Playwright tests
+      - name: Run Playwright tests (Chromium)
         run: |
           cd PROTOTYPE
-          npx playwright test --reporter=list
+          npx playwright test --project=chromium --reporter=list
 
       - name: Upload Playwright reports
         if: always()
