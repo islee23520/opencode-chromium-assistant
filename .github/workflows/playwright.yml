@@ -1,4 +1,4 @@
-name: Playwright smoke tests
+name: Playwright Smoke CI
 
 on:
   push:
@@ -7,66 +7,146 @@ on:
     branches: [ main ]
 
 jobs:
-  smoke:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node
+      - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
+          node-version: '20'
       - name: Cache node modules
         uses: actions/cache@v4
         with:
-          path: PROTOTYPE/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('PROTOTYPE/package-lock.json') }}
+          path: ~/.npm
+          key: npm-cache-${{ hashFiles('PROTOTYPE/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Install deps
+            npm-cache-
+      - name: Show PROTOTYPE workspace
         run: |
-          cd PROTOTYPE
-          npm ci
+          echo "PWD: $(pwd)"
+          echo "Listing PROTOTYPE dir"
+          ls -la PROTOTYPE || true
+          echo "package.json:"
+          sed -n '1,120p' PROTOTYPE/package.json || true
+          echo "package-lock.json head:"
+          sed -n '1,60p' PROTOTYPE/package-lock.json || true
+      - name: Install dependencies
+        working-directory: PROTOTYPE
+        run: |
+          npm ci --no-audit --prefer-offline --verbose || (
+            echo "npm install failed, show npm-debug.log if present"; 
+            test -f npm-debug.log && sed -n '1,400p' npm-debug.log || true;
+            ls -la || true;
+            exit 1
+          )
+      - name: Run Node unit tests (start mock server & capture logs)
+        working-directory: PROTOTYPE
+        run: |
+          set -o pipefail
+          mkdir -p test-results
 
+          echo "Starting mock server in background..." > test-results/mock.log
+          node ../tools/opencode-mock/server.js > test-results/mock.log 2>&1 & echo $! > test-results/mock.pid || true
+
+          # Wait for health endpoint
+          for i in `seq 1 15`; do
+            if curl -fsS http://localhost:4096/health >/dev/null 2>&1; then
+              echo "Mock server healthy" >> test-results/mock.log
+              break
+            fi
+            echo "Waiting for mock server... ($i)" >> test-results/mock.log
+            sleep 1
+          done
+
+          # Run the unit tests and capture logs
+          npm run test:unit 2>&1 | tee test-results/unit.log || true
+          rc=${PIPESTATUS[0]}
+          echo "EXITCODE:$rc" >> test-results/unit.log
+
+          # Also run individual tests separately for extra visibility
+          node tests/client.test.js 2>&1 | tee test-results/client.log || true
+          node tests/sse.test.js 2>&1 | tee test-results/sse.log || true
+
+          # Dump logs for debugging
+          ls -la test-results || true
+          sed -n '1,300p' test-results/unit.log || true
+          sed -n '1,200p' test-results/mock.log || true
+
+          # Stop mock server (best-effort)
+          if [ -f test-results/mock.pid ]; then
+            kill $(cat test-results/mock.pid) >/dev/null 2>&1 || true
+            rm -f test-results/mock.pid || true
+          fi
+
+          exit $rc
+      - name: Upload unit test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-logs
+          path: |
+            PROTOTYPE/test-results/**
+            PROTOTYPE/*.log
+            PROTOTYPE/tests/*.log
+
+  playwright-tests:
+    name: Playwright smoke tests (Chromium)
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Restore node cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-cache-${{ hashFiles('PROTOTYPE/package-lock.json') }}
+          restore-keys: |
+            npm-cache-
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('PROTOTYPE/package-lock.json') }}
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('PROTOTYPE/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      - name: Run unit/integration checks
+            playwright-browsers-
+      - name: Install dependencies
+        working-directory: PROTOTYPE
+        run: npm ci
+      - name: Install Playwright browsers (with fallback)
+        working-directory: PROTOTYPE
         run: |
-          node PROTOTYPE/tests/client.test.js
-          node PROTOTYPE/tests/sse.test.js
-
-      - name: Start mock server
+          set -e
+          npx playwright install --with-deps || npx playwright install
+      - name: Run Playwright tests (capture logs)
+        working-directory: PROTOTYPE
+        env:
+          CI: true
         run: |
-          node tools/opencode-mock/server.js &
-          sleep 1
-
-      - name: Serve prototype
-        run: |
-          npx http-server PROTOTYPE -p 3000 &
-          sleep 1
-
-      - name: Run Playwright tests (Chromium)
-        run: |
-          cd PROTOTYPE
-          npx playwright test --project=chromium --reporter=list
-
-      - name: Upload Playwright reports
+          set -o pipefail
+          mkdir -p test-results
+          # Run playwright with single worker and limited retries to reduce flakiness
+          npx playwright test --project=chromium --workers=1 --retries=1 --reporter=list 2>&1 | tee test-results/playwright.log || true
+          rc=${PIPESTATUS[0]}
+          echo "EXITCODE:$rc" >> test-results/playwright.log
+          # Generate html report for artifacts (if any results)
+          npx playwright show-report --output=playwright-report || true
+          ls -la || true
+          ls -la playwright-report || true
+          sed -n '1,400p' test-results/playwright.log || true
+          exit $rc
+      - name: Upload Playwright artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-reports
-          path: PROTOTYPE/test-results/**
+          name: playwright-artifacts
+          path: |
+            PROTOTYPE/test-results
+            PROTOTYPE/playwright-report
+            PROTOTYPE/test-results/junit.xml

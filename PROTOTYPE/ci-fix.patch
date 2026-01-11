@@ -1,0 +1,182 @@
+diff --git a/PROTOTYPE/global-setup.js b/PROTOTYPE/global-setup.js
+index a160c73..7904b7a 100644
+--- a/PROTOTYPE/global-setup.js
++++ b/PROTOTYPE/global-setup.js
+@@ -32,7 +32,9 @@ async function startIfNeeded(command, args, cwd, healthUrl) {
+     return null;
+   } catch (e) {
+     console.log(`Starting: ${command} ${args.join(' ')} (cwd=${cwd})`);
+-    const proc = spawn(command, args, { cwd, shell: true, detached: false, stdio: 'inherit' });
++    const proc = spawn(command, args, { cwd, shell: true, detached: true, stdio: 'ignore' });
++    // Ensure child doesn't hold the parent event loop
++    if (proc && typeof proc.unref === 'function') proc.unref();
+     // wait for health
+     await waitForUrl(healthUrl, 10000);
+     return proc.pid;
+diff --git a/PROTOTYPE/playwright.config.ts b/PROTOTYPE/playwright.config.ts
+index a07b5f4..909aac7 100644
+--- a/PROTOTYPE/playwright.config.ts
++++ b/PROTOTYPE/playwright.config.ts
+@@ -3,12 +3,20 @@ import { defineConfig } from '@playwright/test';
+ export default defineConfig({
+   testDir: './tests',
+   timeout: 30_000,
++  projects: [
++    {
++      name: 'chromium',
++      use: { browserName: 'chromium' }
++    }
++  ],
+   retries: process.env.CI ? 2 : 0,
+   outputDir: 'test-results',
++  // Exclude Node-style unit test scripts that call process.exit() to avoid interfering with Playwright's runner
++  testIgnore: ['**/*.test.js'],
+   reporter: [
+     ['list'],
+     ['junit', { outputFile: 'test-results/junit.xml' }],
+-    ['html', { open: 'never', outputFolder: 'test-results/html' }]
++    ['html', { open: 'never', outputFolder: 'playwright-report' }]
+   ],
+   globalSetup: require.resolve('./global-setup.js'),
+   globalTeardown: require.resolve('./global-teardown.js'),
+diff --git a/PROTOTYPE/tests/client.test.js b/PROTOTYPE/tests/client.test.js
+index 2228dff..876fc07 100644
+--- a/PROTOTYPE/tests/client.test.js
++++ b/PROTOTYPE/tests/client.test.js
+@@ -1,7 +1,42 @@
+ const assert = require('assert');
++const { spawn } = require('child_process');
++const http = require('http');
++const path = require('path');
+ 
++const ROOT = path.resolve(__dirname, '..', '..');
++const MOCK_SCRIPT = path.join(ROOT, 'tools', 'opencode-mock', 'server.js');
+ const BASE = process.env.MOCK_URL || 'http://localhost:4096';
+ 
++function waitForUrl(url, timeout = 10000) {
++  return new Promise((resolve, reject) => {
++    const start = Date.now();
++    (function poll() {
++      http.get(url, (res) => {
++        if (res.statusCode >= 200 && res.statusCode < 500) return resolve(true);
++        if (Date.now() - start > timeout) return reject(new Error('timeout'));
++        setTimeout(poll, 300);
++      }).on('error', () => {
++        if (Date.now() - start > timeout) return reject(new Error('timeout'));
++        setTimeout(poll, 300);
++      });
++    })();
++  });
++}
++
++async function ensureMockServer() {
++  try {
++    await waitForUrl(BASE + '/health', 1000);
++    console.log('Mock server already running');
++    return null;
++  } catch (e) {
++    console.log('Starting mock server for unit tests...');
++    const proc = spawn('node', [MOCK_SCRIPT], { cwd: ROOT, shell: true, detached: true, stdio: 'ignore' });
++    if (proc && typeof proc.unref === 'function') proc.unref();
++    await waitForUrl(BASE + '/health', 10000);
++    return proc;
++  }
++}
++
+ async function postJson(path, body) {
+   const res = await fetch(BASE + path, {
+     method: 'POST',
+@@ -12,7 +47,10 @@ async function postJson(path, body) {
+ }
+ 
+ (async () => {
++  let mockProc;
+   try {
++    mockProc = await ensureMockServer();
++
+     console.log('Testing 200 response...');
+     let r = await postJson('/v1/chat', { prompt: 'hello' });
+     assert.strictEqual(r.status, 200, 'Expected 200 OK');
+@@ -28,9 +66,29 @@ async function postJson(path, body) {
+     assert.strictEqual(r.status, 429, 'Expected 429 Rate Limit');
+ 
+     console.log('All unit/integration checks passed');
+-    process.exit(0);
++
++    // Cleanup: kill spawned mock server if we started it, destroy HTTP agent sockets
++    if (mockProc) {
++      try { process.kill(mockProc.pid); } catch (e) { /* ignore */ }
++    }
++    try { if (http && http.globalAgent && typeof http.globalAgent.destroy === 'function') http.globalAgent.destroy(); } catch (e) { }
++
++    // Log active handles to help diagnose Windows libuv assertion (temporary)
++    try {
++      if (typeof process._getActiveHandles === 'function') {
++        const names = process._getActiveHandles().map(h => h && h.constructor && h.constructor.name ? h.constructor.name : typeof h);
++        console.log('Active handles before exit:', names);
++      }
++    } catch (e) { }
++
++    // Allow a short delay for handles to close cleanly, then exit
++    setTimeout(() => process.exit(0), 50);
+   } catch (err) {
+     console.error('Test failed', err);
+-    process.exit(1);
++    if (mockProc) {
++      try { process.kill(mockProc.pid); } catch (e) { /* ignore */ }
++    }
++    try { if (http && http.globalAgent && typeof http.globalAgent.destroy === 'function') http.globalAgent.destroy(); } catch (e) { }
++    setTimeout(() => process.exit(1), 50);
+   }
+ })();
+\ No newline at end of file
+diff --git a/PROTOTYPE/tests/sse.test.js b/PROTOTYPE/tests/sse.test.js
+index 5e59922..e570813 100644
+--- a/PROTOTYPE/tests/sse.test.js
++++ b/PROTOTYPE/tests/sse.test.js
+@@ -7,21 +7,40 @@ const URL = process.env.MOCK_URL || 'http://localhost:4096/v1/chat/stream?prompt
+   console.log('Testing SSE stream...');
+   const es = new EventSource(URL);
+   let received = 0;
+-  const timeout = setTimeout(() => { es.close(); process.exit(1); }, 5000);
++  let finished = false;
++  const timeout = setTimeout(() => {
++    if (finished) return;
++    finished = true;
++    try { es.close(); } catch (e) {}
++    try { if (global && globalThis && globalThis.EventSource) {} } catch (e) {}
++    try { if (require('http') && require('http').globalAgent && typeof require('http').globalAgent.destroy === 'function') require('http').globalAgent.destroy(); } catch (e) {}
++    setTimeout(() => process.exit(1), 200);
++  }, 5000);
++
+   es.onmessage = (evt) => {
++    if (finished) return;
+     try {
+       const data = JSON.parse(evt.data);
+       if (data.delta) {
+         received++;
+         console.log('SSE got delta:', data.delta);
+         if (received >= 1) {
++          finished = true;
+           clearTimeout(timeout);
+-          es.close();
++          try { es.close(); } catch (e) {}
++          try { if (require('http') && require('http').globalAgent && typeof require('http').globalAgent.destroy === 'function') require('http').globalAgent.destroy(); } catch (e) {}
+           console.log('SSE test passed');
+-          process.exit(0);
++          setTimeout(() => process.exit(0), 200);
+         }
+       }
+     } catch (e) { console.error('bad json', e); }
+   };
+-  es.onerror = (e) => { console.error('SSE error', e); es.close(); process.exit(1); };
++  es.onerror = (e) => {
++    if (finished) return;
++    finished = true;
++    console.error('SSE error', e);
++    try { es.close(); } catch (err) {}
++    try { if (require('http') && require('http').globalAgent && typeof require('http').globalAgent.destroy === 'function') require('http').globalAgent.destroy(); } catch (err) {}
++    setTimeout(() => process.exit(1), 200);
++  };
+ })();
+\ No newline at end of file
