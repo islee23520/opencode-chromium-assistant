@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="340" viewBox="0 0 620 340">
+  <rect width="100%" height="100%" rx="8" fill="#ffffff" stroke="#e6eef9" />
+  <text x="310" y="46" fill="#0b1220" font-family="Inter, system-ui, sans-serif" font-size="20" text-anchor="middle">Enable OpenCode Assistant</text>
+  <text x="40" y="90" fill="#0b1220" font-family="Inter, system-ui, sans-serif" font-size="14">Opencode Assistant helps summarize pages and answer questions. By enabling, your prompts will be sent to OpenCode's API. Read the <tspan font-weight="bold">OpenCode Terms</tspan> and <tspan font-weight="bold">Privacy Policy</tspan>.</text>
+  <rect x="40" y="180" width="540" height="80" rx="8" fill="#f6fbff" stroke="#dbeefb" />
+  <text x="64" y="212" fill="#0b1220" font-family="Inter, system-ui, sans-serif" font-size="14">[ ] Use my OpenCode API key (recommended - private)</text>
+  <text x="64" y="236" fill="#0b1220" font-family="Inter, system-ui, sans-serif" font-size="14">[ ] Allow Brave to proxy requests (requires agreement)</text>
+  <text x="64" y="260" fill="#0b1220" font-family="Inter, system-ui, sans-serif" font-size="14">[ ] Allow anonymous telemetry to improve assistant (opt-in)</text>
+  <rect x="420" y="260" width="120" height="36" rx="8" fill="#4f8cff" />
+  <text x="480" y="286" fill="#fff" font-size="14" text-anchor="middle">Enable</text>
+  <text x="120" y="306" fill="#9fb0cc" font-family="Inter, system-ui, sans-serif" font-size="12">This project is not affiliated with OpenCode. Powered by OpenCode</text>
+</svg>
