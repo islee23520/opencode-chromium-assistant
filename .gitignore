@@ -1,0 +1,16 @@
+# Node modules
+PROTOTYPE/node_modules/
+
+# Playwright cache and reports
+PROTOTYPE/test-results/
+PROTOTYPE/.cache/
+
+# Temporary files
+PROTOTYPE/.tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE config
+.vscode/
