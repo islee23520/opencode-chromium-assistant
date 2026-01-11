@@ -41,16 +41,24 @@ jobs:
             ls -la || true;
             exit 1
           )
-      - name: Run Node unit tests
+      - name: Run Node unit tests (capture logs)
         working-directory: PROTOTYPE
-        run: npm run test:unit
+        run: |
+          mkdir -p test-results
+          # Run the combined script and capture output
+          npm run test:unit 2>&1 | tee test-results/unit.log
+          # Also run individual tests separately to collect per-test logs
+          node tests/client.test.js 2>&1 | tee test-results/client.log || true
+          node tests/sse.test.js 2>&1 | tee test-results/sse.log || true
       - name: Upload unit test logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-logs
           path: |
-            PROTOTYPE/test-results || PROTOTYPE/*.log || PROTOTYPE/tests/*.log
+            PROTOTYPE/test-results/**
+            PROTOTYPE/*.log
+            PROTOTYPE/tests/*.log
 
   playwright-tests:
     name: Playwright smoke tests (Chromium)
