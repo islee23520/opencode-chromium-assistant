@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="180" viewBox="0 0 300 180">
+  <rect width="100%" height="100%" rx="12" fill="#071a2a" stroke="#1f2b3a" />
+  <text x="24" y="48" fill="#e6eef9" font-family="Inter, system-ui, sans-serif" font-size="16">Opencode Assistant</text>
+  <text x="24" y="80" fill="#9fb0cc" font-family="Inter, system-ui, sans-serif" font-size="12">Summarize this page or ask questions</text>
+  <rect x="24" y="110" width="120" height="36" rx="8" fill="#4f8cff" />
+  <text x="84" y="134" fill="#fff" font-size="13" text-anchor="middle">Try</text>
+  <text x="24" y="164" fill="#9fb0cc" font-size="11">Powered by OpenCode</text>
+</svg>

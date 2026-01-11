@@ -1,0 +1,12 @@
+{
+  "name": "opencode-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start-mock": "node ../tools/opencode-mock/server.js",
+    "test": "npx playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.38.0"
+  }
+}
