@@ -20,12 +20,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: npm-cache-${{ hashFiles('**/package-lock.json') }}
+          key: npm-cache-${{ hashFiles('PROTOTYPE/package-lock.json') }}
           restore-keys: |
             npm-cache-
       - name: Install dependencies
+        working-directory: PROTOTYPE
         run: npm ci
       - name: Run Node unit tests
+        working-directory: PROTOTYPE
         run: npm run test:unit
       - name: Upload unit test logs
         if: always()
@@ -50,23 +52,26 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: npm-cache-${{ hashFiles('**/package-lock.json') }}
+          key: npm-cache-${{ hashFiles('PROTOTYPE/package-lock.json') }}
           restore-keys: |
             npm-cache-
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('PROTOTYPE/package-lock.json') }}
           restore-keys: |
             playwright-browsers-
       - name: Install dependencies
+        working-directory: PROTOTYPE
         run: npm ci
       - name: Install Playwright browsers (with fallback)
+        working-directory: PROTOTYPE
         run: |
           set -e
           npx playwright install --with-deps || npx playwright install
       - name: Run Playwright tests
+        working-directory: PROTOTYPE
         env:
           CI: true
         run: |
