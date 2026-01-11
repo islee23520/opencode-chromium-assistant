@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Opencode Assistant Settings</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main style="max-width:800px;margin:32px auto;">
+    <h1>OpenCode Assistant — Settings</h1>
+    <section>
+      <label for="api-key">Your OpenCode API Key</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+        <input id="api-key" type="text" placeholder="Enter API key" style="flex:1;padding:8px;border-radius:6px;border:1px solid #1f2b3a;" aria-label="API key input" />
+        <button id="save-key" style="padding:8px 12px;border-radius:6px;background:#4f8cff;color:white;border:none;">Save</button>
+      </div>
+      <p id="key-status" style="color:#9fb0cc;margin-top:8px;"></p>
+      <button id="clear-key" style="margin-top:8px;">Remove Key</button>
+    </section>
+    <section style="margin-top:24px;">
+      <h2>Privacy</h2>
+      <p>This is a prototype. In a real browser, keys would be stored in OS secure storage (Keychain/Credential Manager).</p>
+    </section>
+    <a href="index.html">← Back to prototype</a>
+  </main>
+  <script>
+    const apiKeyInput = document.getElementById('api-key');
+    const saveBtn = document.getElementById('save-key');
+    const status = document.getElementById('key-status');
+    const clearBtn = document.getElementById('clear-key');
+
+    function maskKey(k){
+      if(!k) return '';
+      if(k.length <= 8) return '****';
+      return k.slice(0,4) + '••••' + k.slice(-4);
+    }
+
+    function load(){
+      const key = localStorage.getItem('opencode_api_key');
+      if(key){
+        status.textContent = 'Key set: ' + maskKey(key);
+      } else {
+        status.textContent = 'No API key set';
+      }
+    }
+
+    saveBtn.addEventListener('click', ()=>{
+      const k = apiKeyInput.value.trim();
+      if(!k){ alert('Please enter a key'); return; }
+      localStorage.setItem('opencode_api_key', k);
+      load();
+      apiKeyInput.value = '';
+    });
+
+    clearBtn.addEventListener('click', ()=>{ localStorage.removeItem('opencode_api_key'); load(); });
+
+    load();
+  </script>
+</body>
+</html>
