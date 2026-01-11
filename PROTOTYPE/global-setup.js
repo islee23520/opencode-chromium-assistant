@@ -32,7 +32,9 @@ async function startIfNeeded(command, args, cwd, healthUrl) {
     return null;
   } catch (e) {
     console.log(`Starting: ${command} ${args.join(' ')} (cwd=${cwd})`);
-    const proc = spawn(command, args, { cwd, shell: true, detached: false, stdio: 'inherit' });
+    const proc = spawn(command, args, { cwd, shell: true, detached: true, stdio: 'ignore' });
+    // Ensure child doesn't hold the parent event loop
+    if (proc && typeof proc.unref === 'function') proc.unref();
     // wait for health
     await waitForUrl(healthUrl, 10000);
     return proc.pid;
